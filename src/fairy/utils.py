@@ -15,8 +15,8 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool, InjectedToolArg
 from tavily import TavilyClient
 
-from deep_research_from_scratch.state_research import Summary
-from deep_research_from_scratch.prompts import summarize_webpage_prompt
+from fairy.state_research import Summary
+from fairy.prompts import summarize_webpage_prompt
 
 # ===== UTILITY FUNCTIONS =====
 
