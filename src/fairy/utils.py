@@ -1,8 +1,8 @@
 
-"""Research Utilities and Tools.
+"""研究工具与实用程序
 
-This module provides search and content processing utilities for the research agent,
-including web search capabilities and content summarization tools.
+本模块为研究代理提供搜索和内容处理的实用程序，
+包括网络搜索功能和内容摘要工具。
 """
 
 from pathlib import Path
@@ -18,33 +18,33 @@ from tavily import TavilyClient
 from fairy.state_research import Summary
 from fairy.prompts import summarize_webpage_prompt
 
-# ===== UTILITY FUNCTIONS =====
+# ===== 工具函数 =====
 
 def get_today_str() -> str:
-    """Get current date in a human-readable format."""
+    """获取当前日期的人类可读格式。"""
     return datetime.now().strftime("%a %b %-d, %Y")
 
 def get_current_dir() -> Path:
-    """Get the current directory of the module.
+    """获取模块所在的当前目录。
 
-    This function is compatible with Jupyter notebooks and regular Python scripts.
+    此函数兼容 Jupyter notebook 和常规 Python 脚本。
 
-    Returns:
-        Path object representing the current directory
+    返回值：
+        表示当前目录的 Path 对象
     """
     try:
         return Path(__file__).resolve().parent
-    except NameError:  # __file__ is not defined
+    except NameError:  # __file__ 未定义
         return Path.cwd()
 
-# ===== CONFIGURATION =====
+# ===== 配置 =====
 
 from fairy.init_model import init_model
 
 summarization_model = init_model(model="gpt-4.1-mini")
 tavily_client = TavilyClient()
 
-# ===== SEARCH FUNCTIONS =====
+# ===== 搜索函数 =====
 
 def tavily_search_multiple(
     search_queries: List[str], 
@@ -52,19 +52,19 @@ def tavily_search_multiple(
     topic: Literal["general", "news", "finance"] = "general", 
     include_raw_content: bool = True, 
 ) -> List[dict]:
-    """Perform search using Tavily API for multiple queries.
+    """使用 Tavily API 执行多个查询的搜索。
 
-    Args:
-        search_queries: List of search queries to execute
-        max_results: Maximum number of results per query
-        topic: Topic filter for search results
-        include_raw_content: Whether to include raw webpage content
+    参数：
+        search_queries: 要执行的搜索查询列表
+        max_results: 每个查询返回的最大结果数
+        topic: 搜索结果的主题过滤器
+        include_raw_content: 是否包含原始网页内容
 
-    Returns:
-        List of search result dictionaries
+    返回值：
+        搜索结果字典列表
     """
 
-    # Execute searches sequentially. Note: yon can use AsyncTavilyClient to parallelize this step.
+    # 顺序执行搜索。注意：可使用 AsyncTavilyClient 来并行化此步骤。
     search_docs = []
     for query in search_queries:
         result = tavily_client.search(
@@ -78,19 +78,19 @@ def tavily_search_multiple(
     return search_docs
 
 def summarize_webpage_content(webpage_content: str) -> str:
-    """Summarize webpage content using the configured summarization model.
+    """使用配置的摘要模型对网页内容进行摘要。
 
-    Args:
-        webpage_content: Raw webpage content to summarize
+    参数：
+        webpage_content: 需要摘要的原始网页内容
 
-    Returns:
-        Formatted summary with key excerpts
+    返回值：
+        包含关键摘录的格式化摘要
     """
     try:
-        # Set up structured output model for summarization
+        # 设置用于摘要的结构化输出模型
         structured_model = summarization_model.with_structured_output(Summary)
 
-        # Generate summary
+        # 生成摘要
         summary = structured_model.invoke([
             HumanMessage(content=summarize_webpage_prompt.format(
                 webpage_content=webpage_content, 
@@ -98,7 +98,7 @@ def summarize_webpage_content(webpage_content: str) -> str:
             ))
         ])
 
-        # Format summary with clear structure
+        # 以清晰的结构格式化摘要
         formatted_summary = (
             f"<summary>\n{summary.summary}\n</summary>\n\n"
             f"<key_excerpts>\n{summary.key_excerpts}\n</key_excerpts>"
@@ -107,17 +107,17 @@ def summarize_webpage_content(webpage_content: str) -> str:
         return formatted_summary
 
     except Exception as e:
-        print(f"Failed to summarize webpage: {str(e)}")
+        print(f"网页摘要失败: {str(e)}")
         return webpage_content[:1000] + "..." if len(webpage_content) > 1000 else webpage_content
 
 def deduplicate_search_results(search_results: List[dict]) -> dict:
-    """Deduplicate search results by URL to avoid processing duplicate content.
+    """按 URL 对搜索结果去重，避免处理重复内容。
 
-    Args:
-        search_results: List of search result dictionaries
+    参数：
+        search_results: 搜索结果字典列表
 
-    Returns:
-        Dictionary mapping URLs to unique results
+    返回值：
+        URL 映射到唯一结果的字典
     """
     unique_results = {}
 
@@ -130,22 +130,22 @@ def deduplicate_search_results(search_results: List[dict]) -> dict:
     return unique_results
 
 def process_search_results(unique_results: dict) -> dict:
-    """Process search results by summarizing content where available.
+    """处理搜索结果，在可能的情况下生成内容摘要。
 
-    Args:
-        unique_results: Dictionary of unique search results
+    参数：
+        unique_results: 唯一搜索结果的字典
 
-    Returns:
-        Dictionary of processed results with summaries
+    返回值：
+        包含摘要的已处理结果字典
     """
     summarized_results = {}
 
     for url, result in unique_results.items():
-        # Use existing content if no raw content for summarization
+        # 如果没有原始内容可用于摘要，则使用现有内容
         if not result.get("raw_content"):
             content = result['content']
         else:
-            # Summarize raw content for better processing
+            # 对原始内容进行摘要以便更好地处理
             content = summarize_webpage_content(result['raw_content'])
 
         summarized_results[url] = {
@@ -156,28 +156,28 @@ def process_search_results(unique_results: dict) -> dict:
     return summarized_results
 
 def format_search_output(summarized_results: dict) -> str:
-    """Format search results into a well-structured string output.
+    """将搜索结果格式化为结构清晰的字符串输出。
 
-    Args:
-        summarized_results: Dictionary of processed search results
+    参数：
+        summarized_results: 已处理的搜索结果字典
 
-    Returns:
-        Formatted string of search results with clear source separation
+    返回值：
+        具有清晰来源分隔的格式化搜索结果字符串
     """
     if not summarized_results:
-        return "No valid search results found. Please try different search queries or use a different search API."
+        return "未找到有效的搜索结果。请尝试不同的搜索查询或使用其他搜索 API。"
 
-    formatted_output = "Search results: \n\n"
+    formatted_output = "搜索结果：\n\n"
 
     for i, (url, result) in enumerate(summarized_results.items(), 1):
-        formatted_output += f"\n\n--- SOURCE {i}: {result['title']} ---\n"
+        formatted_output += f"\n\n--- 来源 {i}: {result['title']} ---\n"
         formatted_output += f"URL: {url}\n\n"
-        formatted_output += f"SUMMARY:\n{result['content']}\n\n"
+        formatted_output += f"摘要：\n{result['content']}\n\n"
         formatted_output += "-" * 80 + "\n"
 
     return formatted_output
 
-# ===== RESEARCH TOOLS =====
+# ===== 研究工具 =====
 
 @tool(parse_docstring=True)
 def tavily_search(
@@ -185,56 +185,56 @@ def tavily_search(
     max_results: Annotated[int, InjectedToolArg] = 3,
     topic: Annotated[Literal["general", "news", "finance"], InjectedToolArg] = "general",
 ) -> str:
-    """Fetch results from Tavily search API with content summarization.
+    """从 Tavily 搜索 API 获取结果并进行内容摘要。
 
-    Args:
-        query: A single search query to execute
-        max_results: Maximum number of results to return
-        topic: Topic to filter results by ('general', 'news', 'finance')
+    参数：
+        query: 要执行的单个搜索查询
+        max_results: 返回的最大结果数
+        topic: 用于过滤结果的主题（'general'、'news'、'finance'）
 
-    Returns:
-        Formatted string of search results with summaries
+    返回值：
+        包含摘要的格式化搜索结果字符串
     """
-    # Execute search for single query
+    # 执行单个查询的搜索
     search_results = tavily_search_multiple(
-        [query],  # Convert single query to list for the internal function
+        [query],  # 将单个查询转换为列表以供内部函数使用
         max_results=max_results,
         topic=topic,
         include_raw_content=True,
     )
 
-    # Deduplicate results by URL to avoid processing duplicate content
+    # 按 URL 去重以避免处理重复内容
     unique_results = deduplicate_search_results(search_results)
 
-    # Process results with summarization
+    # 处理结果并生成摘要
     summarized_results = process_search_results(unique_results)
 
-    # Format output for consumption
+    # 格式化输出以供使用
     return format_search_output(summarized_results)
 
 @tool(parse_docstring=True)
 def think_tool(reflection: str) -> str:
-    """Tool for strategic reflection on research progress and decision-making.
+    """用于研究进展战略性反思和决策的工具。
 
-    Use this tool after each search to analyze results and plan next steps systematically.
-    This creates a deliberate pause in the research workflow for quality decision-making.
+    在每次搜索后使用此工具，系统地分析结果并规划下一步行动。
+    这在研究工作流中创建一个刻意的暂停，以便做出高质量的决策。
 
-    When to use:
-    - After receiving search results: What key information did I find?
-    - Before deciding next steps: Do I have enough to answer comprehensively?
-    - When assessing research gaps: What specific information am I still missing?
-    - Before concluding research: Can I provide a complete answer now?
+    使用时机：
+    - 收到搜索结果后：我找到了哪些关键信息？
+    - 决定下一步之前：我是否有足够的信息来全面回答？
+    - 评估研究缺口时：我还缺少哪些具体信息？
+    - 结束研究之前：我现在能提供完整的答案吗？
 
-    Reflection should address:
-    1. Analysis of current findings - What concrete information have I gathered?
-    2. Gap assessment - What crucial information is still missing?
-    3. Quality evaluation - Do I have sufficient evidence/examples for a good answer?
-    4. Strategic decision - Should I continue searching or provide my answer?
+    反思应涵盖：
+    1. 当前发现分析 - 我收集到了哪些具体信息？
+    2. 缺口评估 - 还缺少哪些关键信息？
+    3. 质量评估 - 我是否有足够的证据/示例来提供优质答案？
+    4. 战略决策 - 我应该继续搜索还是提供答案？
 
-    Args:
-        reflection: Your detailed reflection on research progress, findings, gaps, and next steps
+    参数：
+        reflection: 关于研究进展、发现、缺口和下一步行动的详细反思
 
-    Returns:
-        Confirmation that reflection was recorded for decision-making
+    返回值：
+        确认反思已记录以供决策使用
     """
-    return f"Reflection recorded: {reflection}"
+    return f"反思已记录：{reflection}"

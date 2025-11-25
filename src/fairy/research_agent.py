@@ -1,8 +1,8 @@
 
-"""Research Agent Implementation.
+"""研究代理实现模块
 
-This module implements a research agent that can perform iterative web searches
-and synthesis to answer complex research questions.
+本模块实现了一个研究代理，能够执行迭代式网络搜索并综合信息，
+以回答复杂的研究问题。
 """
 
 from pydantic import BaseModel, Field
@@ -15,28 +15,28 @@ from fairy.state_research import ResearcherState, ResearcherOutputState
 from fairy.utils import tavily_search, get_today_str, think_tool
 from fairy.prompts import research_agent_prompt, compress_research_system_prompt, compress_research_human_message
 
-# ===== CONFIGURATION =====
+# ===== 配置 =====
 
-# Set up tools and model binding
+# 设置工具和模型绑定
 tools = [tavily_search, think_tool]
 tools_by_name = {tool.name: tool for tool in tools}
 
-# Initialize models
+# 初始化模型
 model = init_model(model="gpt-4.1")
 model_with_tools = model.bind_tools(tools)
 summarization_model = init_model(model="gpt-4.1-mini")
 compress_model = init_model(model="gpt-4.1")
 
-# ===== AGENT NODES =====
+# ===== 代理节点 =====
 
 def llm_call(state: ResearcherState):
-    """Analyze current state and decide on next actions.
+    """分析当前状态并决定下一步行动。
 
-    The model analyzes the current conversation state and decides whether to:
-    1. Call search tools to gather more information
-    2. Provide a final answer based on gathered information
+    模型分析当前对话状态，并决定是否：
+    1. 调用搜索工具收集更多信息
+    2. 基于已收集的信息提供最终答案
 
-    Returns updated state with the model's response.
+    返回包含模型响应的更新状态。
     """
     return {
         "researcher_messages": [
@@ -47,20 +47,20 @@ def llm_call(state: ResearcherState):
     }
 
 def tool_node(state: ResearcherState):
-    """Execute all tool calls from the previous LLM response.
+    """执行上一次 LLM 响应中的所有工具调用。
 
-    Executes all tool calls from the previous LLM responses.
-    Returns updated state with tool execution results.
+    执行前一次 LLM 响应中的全部工具调用，
+    返回包含工具执行结果的更新状态。
     """
     tool_calls = state["researcher_messages"][-1].tool_calls
 
-    # Execute all tool calls
+    # 执行所有工具调用
     observations = []
     for tool_call in tool_calls:
         tool = tools_by_name[tool_call["name"]]
         observations.append(tool.invoke(tool_call["args"]))
 
-    # Create tool message outputs
+    # 创建工具消息输出
     tool_outputs = [
         ToolMessage(
             content=observation,
@@ -72,17 +72,17 @@ def tool_node(state: ResearcherState):
     return {"researcher_messages": tool_outputs}
 
 def compress_research(state: ResearcherState) -> dict:
-    """Compress research findings into a concise summary.
+    """将研究发现压缩为简洁的摘要。
 
-    Takes all the research messages and tool outputs and creates
-    a compressed summary suitable for the supervisor's decision-making.
+    汇总所有研究消息和工具输出，生成适合
+    上级代理决策使用的精炼摘要。
     """
 
     system_message = compress_research_system_prompt.format(date=get_today_str())
     messages = [SystemMessage(content=system_message)] + state.get("researcher_messages", []) + [HumanMessage(content=compress_research_human_message)]
     response = compress_model.invoke(messages)
 
-    # Extract raw notes from tool and AI messages
+    # 从工具消息和 AI 消息中提取原始笔记
     raw_notes = [
         str(m.content) for m in filter_messages(
             state["researcher_messages"], 
@@ -95,49 +95,49 @@ def compress_research(state: ResearcherState) -> dict:
         "raw_notes": ["\n".join(raw_notes)]
     }
 
-# ===== ROUTING LOGIC =====
+# ===== 路由逻辑 =====
 
 def should_continue(state: ResearcherState) -> Literal["tool_node", "compress_research"]:
-    """Determine whether to continue research or provide final answer.
+    """判断是否继续研究或提供最终答案。
 
-    Determines whether the agent should continue the research loop or provide
-    a final answer based on whether the LLM made tool calls.
+    根据 LLM 是否发起工具调用，决定代理应继续研究循环
+    还是提供最终答案。
 
-    Returns:
-        "tool_node": Continue to tool execution
-        "compress_research": Stop and compress research
+    返回值：
+        "tool_node": 继续执行工具调用
+        "compress_research": 停止搜索并压缩研究结果
     """
     messages = state["researcher_messages"]
     last_message = messages[-1]
 
-    # If the LLM makes a tool call, continue to tool execution
+    # 如果 LLM 发起工具调用，则继续执行工具
     if last_message.tool_calls:
         return "tool_node"
-    # Otherwise, we have a final answer
+    # 否则，返回最终答案
     return "compress_research"
 
-# ===== GRAPH CONSTRUCTION =====
+# ===== 图构建 =====
 
-# Build the agent workflow
+# 构建代理工作流
 agent_builder = StateGraph(ResearcherState, output_schema=ResearcherOutputState)
 
-# Add nodes to the graph
+# 向图中添加节点
 agent_builder.add_node("llm_call", llm_call)
 agent_builder.add_node("tool_node", tool_node)
 agent_builder.add_node("compress_research", compress_research)
 
-# Add edges to connect nodes
+# 添加边以连接节点
 agent_builder.add_edge(START, "llm_call")
 agent_builder.add_conditional_edges(
     "llm_call",
     should_continue,
     {
-        "tool_node": "tool_node", # Continue research loop
-        "compress_research": "compress_research", # Provide final answer
+        "tool_node": "tool_node", # 继续研究循环
+        "compress_research": "compress_research", # 提供最终答案
     },
 )
-agent_builder.add_edge("tool_node", "llm_call") # Loop back for more research
+agent_builder.add_edge("tool_node", "llm_call") # 循环回去继续研究
 agent_builder.add_edge("compress_research", END)
 
-# Compile the agent
+# 编译代理
 researcher_agent = agent_builder.compile()

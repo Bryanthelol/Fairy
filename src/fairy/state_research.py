@@ -1,9 +1,9 @@
 
 """
-State Definitions and Pydantic Schemas for Research Agent
+研究代理的状态定义与 Pydantic 模式
 
-This module defines the state objects and structured schemas used for
-the research agent workflow, including researcher state management and output schemas.
+本模块定义了研究代理工作流所使用的状态对象和结构化模式，
+包括研究者状态管理和输出模式。
 """
 
 import operator
@@ -12,15 +12,14 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-# ===== STATE DEFINITIONS =====
+# ===== 状态定义 =====
 
 class ResearcherState(TypedDict):
     """
-    State for the research agent containing message history and research metadata.
+    研究代理的状态，包含消息历史和研究元数据。
 
-    This state tracks the researcher's conversation, iteration count for limiting
-    tool calls, the research topic being investigated, compressed findings,
-    and raw research notes for detailed analysis.
+    此状态跟踪研究者的对话、用于限制工具调用的迭代次数、
+    正在研究的主题、压缩后的发现以及用于详细分析的原始研究笔记。
     """
     researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_call_iterations: int
@@ -30,36 +29,36 @@ class ResearcherState(TypedDict):
 
 class ResearcherOutputState(TypedDict):
     """
-    Output state for the research agent containing final research results.
+    研究代理的输出状态，包含最终研究结果。
 
-    This represents the final output of the research process with compressed
-    research findings and all raw notes from the research process.
+    表示研究过程的最终输出，包括压缩后的研究发现
+    以及研究过程中的所有原始笔记。
     """
     compressed_research: str
     raw_notes: Annotated[List[str], operator.add]
     researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
 
-# ===== STRUCTURED OUTPUT SCHEMAS =====
+# ===== 结构化输出模式 =====
 
 class ClarifyWithUser(BaseModel):
-    """Schema for user clarification decisions during scoping phase."""
+    """范围界定阶段用户澄清决策的模式。"""
     need_clarification: bool = Field(
-        description="Whether the user needs to be asked a clarifying question.",
+        description="是否需要向用户提出澄清问题。",
     )
     question: str = Field(
-        description="A question to ask the user to clarify the report scope",
+        description="向用户提出的澄清报告范围的问题",
     )
     verification: str = Field(
-        description="Verify message that we will start research after the user has provided the necessary information.",
+        description="确认消息，表明在用户提供必要信息后将开始研究。",
     )
 
 class ResearchQuestion(BaseModel):
-    """Schema for research brief generation."""
+    """研究简报生成的模式。"""
     research_brief: str = Field(
-        description="A research question that will be used to guide the research.",
+        description="用于指导研究的研究问题。",
     )
 
 class Summary(BaseModel):
-    """Schema for webpage content summarization."""
-    summary: str = Field(description="Concise summary of the webpage content")
-    key_excerpts: str = Field(description="Important quotes and excerpts from the content")
+    """网页内容摘要的模式。"""
+    summary: str = Field(description="网页内容的简明摘要")
+    key_excerpts: str = Field(description="内容中的重要引述和摘录")
