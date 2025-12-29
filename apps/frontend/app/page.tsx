@@ -37,14 +37,26 @@ export default function Page() {
     return last?.id ?? 0;
   }, [events]);
 
+  const hasResearchStarted = useMemo(() => {
+    // 后端在开始研究时会 emit("research_progress", {stage:"start"})
+    // 研究完成/报告完成也一定意味着已经进入过研究阶段
+    return events.some(
+      (e) =>
+        e.type === "research_progress" ||
+        e.type === "research_complete" ||
+        e.type === "final_report_ready"
+    );
+  }, [events]);
+
   const currentStepIndex = useMemo(() => {
     if (report) return 4;
-    if (brief && (rawNotes.length > 0 || status === "completed")) return 3;
+    // 一旦收到 research_progress（start）就应进入“执行研究”阶段展示
+    if (hasResearchStarted) return 3;
     if (brief) return 2;
     if (clarification) return 1;
     if (sessionId) return 0;
     return 0;
-  }, [report, brief, clarification, rawNotes.length, status, sessionId]);
+  }, [report, hasResearchStarted, brief, clarification, sessionId]);
 
   async function ensureSession() {
     if (sessionId) return sessionId;
